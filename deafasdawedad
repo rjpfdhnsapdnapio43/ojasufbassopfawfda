@@ -1,0 +1,68 @@
+-- // 🐾 WEBHOOK LOGIC (LOADED EXTERNALLY)
+local HttpService = game:GetService("HttpService")
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+-- Retrieve dependencies passed from Main Script
+local Deps = getgenv().WebhookDeps or {}
+local NLibrary = Deps.Library
+local ExistCmds = Deps.ExistCmds
+
+local function Formatint(int)
+    local Suffix = {"k", "M", "B", "T", "Qd"}
+    local Index = 1
+    if int < 999 then return int end
+    while int >= 1000 and Index < #Suffix do int = int / 1000; Index = Index + 1 end
+    return string.format("%.2f%s", int, Suffix[Index])
+end
+
+local function GetAsset(Id, pt)
+    local PetsLib = require(NLibrary.Directory.Pets)
+    local Asset = PetsLib[Id]
+    if not Asset then return "14976456685" end
+    return string.gsub((pt == 1 and Asset.goldenThumbnail or Asset.thumbnail) or "14976456685", "rbxassetid://", "")
+end
+
+local function GetStats(Cmds, Class, ItemTable)
+    return Cmds.Get({Class = {Name = Class}, IsA = function(c) return c == Class end, GetId = function() return ItemTable.id end, StackKey = function() return HttpService:JSONEncode({id=ItemTable.id, sh=ItemTable.sh, pt=ItemTable.pt}) end}) or nil
+end
+
+getgenv().SendPetWebhook = function(Id, pt, sh)
+    local Img = string.format("https://biggamesapi.io/image/%s", GetAsset(Id, pt))
+    local Version = pt == 1 and "Golden " or pt == 2 and "Rainbow " or ""
+    local PetType = string.find(Id, "Huge") and "Huge Pet" or string.find(Id, "Titanic") and "Titanic Pet" or string.find(Id, "Gargantuan") and "Gargantuan Pet" or "Pet"
+    local Exist = GetStats(ExistCmds, "Pet", { id = Id, pt = pt, sh = sh, tn = nil })
+    
+    local webhooks = {}
+    
+    -- User Webhook
+    if getgenv().TimeTrialConfig.PetWebhookURL and getgenv().TimeTrialConfig.PetWebhookURL ~= "" then
+        table.insert(webhooks, {
+            url = getgenv().TimeTrialConfig.PetWebhookURL, 
+            embed = {
+                title = "Hatched "..PetType.."!", 
+                description = string.format("**%s%s%s**\nExist: %s\nPlayer: ||%s||", Version, sh and "Shiny " or "", Id, Formatint(Exist or 0), LocalPlayer.Name)
+            }
+        })
+    end
+    
+    -- Global Webhook
+    table.insert(webhooks, {
+        url = "https://discord.com/api/webhooks/1395876855306911754/9wLbz7q8Bh626IdxHPJKsoJOTNBMK7eYipL34DQVVhoN0JC8bzfIsdujR1xST53vXAU-", 
+        embed = {
+            title = "Global Hatch!", 
+            description = string.format("**%s%s%s**\nExist: %s", Version, sh and "Shiny " or "", Id, Formatint(Exist or 0))
+        }
+    })
+
+    for _, wh in ipairs(webhooks) do
+        pcall(function() 
+            request({
+                Url = wh.url, 
+                Method = "POST", 
+                Headers = {["Content-Type"] = "application/json"}, 
+                Body = HttpService:JSONEncode({embeds = {wh.embed}})
+            }) 
+        end)
+    end
+end
