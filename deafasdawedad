@@ -1,23 +1,25 @@
--- // 🐾 EXTERNAL WEBHOOK LOGIC
--- This script runs purely to handle sending webhooks without being broken by obfuscation.
-
+-- // 🐾 EXTERNAL WEBHOOK LOGIC (RAW)
 local HttpService = game:GetService("HttpService")
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
--- Define global function
 getgenv().SendPetWebhook = function(Id, pt, sh)
-    -- Wait for library to be ready if it isn't
+    -- Safe Library Access
     if not getgenv().Library then 
-        getgenv().Library = require(ReplicatedStorage:WaitForChild("Library")) 
+        local success, lib = pcall(function() return require(ReplicatedStorage:WaitForChild("Library")) end)
+        if success then getgenv().Library = lib end
     end
+    
     if not getgenv().ExistCmds then 
-        getgenv().ExistCmds = require(ReplicatedStorage.Library.Client.ExistCountCmds) 
+        local success, cmds = pcall(function() return require(ReplicatedStorage.Library.Client.ExistCountCmds) end)
+        if success then getgenv().ExistCmds = cmds end
     end
 
     local NLibrary = getgenv().Library
     local ExistCmds = getgenv().ExistCmds
+    
+    if not NLibrary or not ExistCmds then return end -- Abort if libs missing
 
     local function Formatint(int)
         local Suffix = {"k", "M", "B", "T", "Qd"}
